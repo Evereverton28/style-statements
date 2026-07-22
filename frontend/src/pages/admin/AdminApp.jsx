@@ -7,13 +7,14 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Megaphone, Star,
   BarChart3, MessageSquare, FileText, ShieldCheck, Settings as Cog,
   Search, Bell, Plus, Pencil, Trash2, X, TrendingUp, TrendingDown,
-  AlertTriangle, DollarSign, Eye, Percent, Check, Menu, LogOut, Filter,
+  AlertTriangle, DollarSign, Eye, Percent, Check, Menu, LogOut, Filter, Sun, Moon,
 } from "lucide-react";
 import { authService } from "../../services/authService";
 import { productService } from "../../services/productService";
 import { orderService } from "../../services/orderService";
 import { api } from "../../services/api";
 import AuthForm from "../../components/auth/AuthForm";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ---------- API <-> UI mapping (backend uses snake_case statuses) ---------- */
 const STATUS_DISPLAY = {
@@ -28,12 +29,14 @@ const mapApiOrder = (o) => ({ id: o.order_number, apiId: o.id, customer: o.custo
 const mapApiReview = (r) => ({ id: r.id, product: r.product_id, author: r.author, rating: r.rating, text: r.body, status: REVIEW_DISPLAY[r.status] || r.status });
 
 /* ---------- Brand tokens (shared with the storefront) ---------- */
+/* ---------- Brand tokens → CSS variables (themeable) ---------- */
 const C = {
-  teal: "#0A4548", tealDeep: "#062B2D", tealBright: "#0E5F63",
-  panel: "#0B1717", panel2: "#0F2122", cyan: "#25C2C7",
-  gold: "#C9A24B", goldLite: "#E6CD8C", ink: "#070C0C",
-  ivory: "#F6F3EC", dim: "#8FA0A0", line: "rgba(246,243,236,0.09)",
-  green: "#2FB37A", red: "#D9646A", amber: "#D9A441",
+  teal: "var(--ss-teal)", tealDeep: "var(--ss-teal-deep)", tealBright: "var(--ss-teal-bright)",
+  panel: "var(--ss-panel)", panel2: "var(--ss-panel2)", cyan: "var(--ss-cyan)",
+  gold: "var(--ss-gold)", goldLite: "var(--ss-gold-lite)", ink: "var(--ss-ink)",
+  ivory: "var(--ss-ivory)", dim: "var(--ss-dim)", line: "var(--ss-line)",
+  green: "var(--ss-green)", red: "var(--ss-red)", amber: "var(--ss-amber)",
+  bg: "var(--ss-bg)", topbar: "var(--ss-topbar)",
 };
 const serif = { fontFamily: "'Playfair Display', Georgia, serif" };
 const sans = { fontFamily: "'Inter', system-ui, sans-serif" };
@@ -77,7 +80,7 @@ const PIE = [C.gold, C.cyan, C.tealBright, C.goldLite];
 export default function Admin() {
   const [role, setRole] = useState("Super Admin");
   const [section, setSection] = useState("dashboard");
-  const [sidebar, setSidebar] = useState(true);
+  const [sidebar, setSidebar] = useState(() => (typeof window !== "undefined" ? window.innerWidth > 900 : true));
   const [products, setProducts] = useState(seedProducts);
   const [orders, setOrders] = useState(seedOrders);
   const [reviews, setReviews] = useState(seedReviews);
@@ -85,6 +88,7 @@ export default function Admin() {
   const [modal, setModal] = useState(null); // {mode, product}
   const [orderTab, setOrderTab] = useState("All");
   const [pq, setPq] = useState("");
+  const { isLight, toggle } = useTheme();
 
   // ---- live backend integration ----
   const seededUser = authService.currentUser();
@@ -552,7 +556,7 @@ export default function Admin() {
   if (!authed) return <LoginGate onAuthed={(u) => { setRole(u.role === "super_admin" ? "Super Admin" : u.role === "manager" ? "Manager" : "Staff"); setAuthed(true); }} />;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: C.ink, ...sans }}>
+    <div className={`ss-theme ${isLight ? "light" : ""}`} style={{ display: "flex", minHeight: "100vh", background: C.bg, ...sans }}>
       {!apiOnline && (
         <div style={{ position: "fixed", bottom: 14, left: 14, zIndex: 90, ...sans, fontSize: 11.5, color: C.amber, background: "rgba(217,164,65,0.12)", border: `1px solid rgba(217,164,65,0.4)`, borderRadius: 8, padding: "8px 12px" }}>
           Backend offline — showing demo data. Start the API at {api.base}
@@ -560,16 +564,35 @@ export default function Admin() {
       )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+        .ss-theme {
+          --ss-teal:#0A4548; --ss-teal-deep:#062B2D; --ss-teal-bright:#0E5F63;
+          --ss-panel:#0B1717; --ss-panel2:#0F2122; --ss-cyan:#25C2C7;
+          --ss-gold:#C9A24B; --ss-gold-lite:#E6CD8C; --ss-ink:#070C0C;
+          --ss-ivory:#F6F3EC; --ss-dim:#8FA0A0; --ss-line:rgba(246,243,236,0.09);
+          --ss-green:#2FB37A; --ss-red:#D9646A; --ss-amber:#D9A441;
+          --ss-bg:#070C0C; --ss-topbar:rgba(11,23,23,0.9);
+        }
+        .ss-theme.light {
+          --ss-panel:#FFFFFF; --ss-panel2:#F2EFE8; --ss-gold-lite:#8A6D22;
+          --ss-ivory:#14201F; --ss-dim:#61706E; --ss-line:rgba(7,12,12,0.10);
+          --ss-bg:#ECE8E0; --ss-topbar:rgba(255,255,255,0.9);
+        }
         * { box-sizing: border-box; }
         .ss-kpi { display:grid; grid-template-columns: repeat(6, 1fr); gap:14px; }
         .ss-two { display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+        .ss-sb-backdrop { display:none; }
         ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:${C.line};border-radius:4px}
         @media (max-width:1050px){ .ss-kpi{grid-template-columns:repeat(3,1fr)} .ss-two{grid-template-columns:1fr} }
+        @media (max-width:900px){
+          .ss-sidebar { position: fixed !important; z-index: 100; height: 100vh; }
+          .ss-sb-backdrop { display:block; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
+        }
         @media (max-width:640px){ .ss-kpi{grid-template-columns:repeat(2,1fr)} }
       `}</style>
+      {sidebar && <div className="ss-sb-backdrop" onClick={() => setSidebar(false)} />}
 
       {/* SIDEBAR */}
-      <aside style={{ width: sidebar ? 236 : 0, flexShrink: 0, overflow: "hidden", background: C.panel, borderRight: `1px solid ${C.line}`, transition: "width .25s ease", position: "sticky", top: 0, height: "100vh" }}>
+      <aside className="ss-sidebar" style={{ width: sidebar ? 236 : 0, flexShrink: 0, overflow: "hidden", background: C.panel, borderRight: `1px solid ${C.line}`, transition: "width .25s ease", position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ width: 236, height: "100%", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${C.line}` }}>
             <div style={{ ...serif, color: C.ivory, fontSize: 18, letterSpacing: 3 }}>STYLE</div>
@@ -591,7 +614,7 @@ export default function Admin() {
       {/* MAIN */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* TOPBAR */}
-        <header style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(11,23,23,0.9)", backdropFilter: "blur(10px)", borderBottom: `1px solid ${C.line}`, padding: "12px 22px", display: "flex", alignItems: "center", gap: 14 }}>
+        <header style={{ position: "sticky", top: 0, zIndex: 20, background: "var(--ss-topbar)", backdropFilter: "blur(10px)", borderBottom: `1px solid ${C.line}`, padding: "12px 22px", display: "flex", alignItems: "center", gap: 14 }}>
           <button onClick={() => setSidebar((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", display: "grid", placeItems: "center" }}><Menu size={20} color={C.ivory} /></button>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 7, padding: "8px 12px", flex: 1, maxWidth: 380 }}>
             <Search size={15} color={C.dim} /><input placeholder="Search orders, products, customers…" style={{ ...sans, background: "none", border: "none", color: C.ivory, outline: "none", width: "100%", fontSize: 13 }} />
@@ -604,6 +627,9 @@ export default function Admin() {
               {Object.keys(ROLES).map((r) => <option key={r}>{r}</option>)}
             </select>
           </div>
+          <button onClick={toggle} aria-label="Toggle light or dark mode" style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: 9, cursor: "pointer", display: "grid", placeItems: "center" }}>
+            {isLight ? <Moon size={17} color={C.ivory} /> : <Sun size={17} color={C.ivory} />}
+          </button>
           <button style={{ position: "relative", background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: 9, cursor: "pointer", display: "grid", placeItems: "center" }}>
             <Bell size={17} color={C.ivory} />
             <span style={{ position: "absolute", top: 5, right: 6, width: 7, height: 7, borderRadius: 999, background: C.red }} />
@@ -653,9 +679,25 @@ function ProductForm({ initial, onSave, inp }) {
 
 /* ---------- Admin login/signup gate ---------- */
 function LoginGate({ onAuthed }) {
+  const { isLight } = useTheme();
   return (
-    <div style={{ minHeight: "100vh", background: C.ink, display: "grid", placeItems: "center", padding: 20 }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');`}</style>
+    <div className={`ss-theme ${isLight ? "light" : ""}`} style={{ minHeight: "100vh", background: C.bg, display: "grid", placeItems: "center", padding: 20 }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+        .ss-theme {
+          --ss-teal:#0A4548; --ss-teal-deep:#062B2D; --ss-teal-bright:#0E5F63;
+          --ss-panel:#0B1717; --ss-panel2:#0F2122; --ss-cyan:#25C2C7;
+          --ss-gold:#C9A24B; --ss-gold-lite:#E6CD8C; --ss-ink:#070C0C;
+          --ss-ivory:#F6F3EC; --ss-dim:#8FA0A0; --ss-line:rgba(246,243,236,0.09);
+          --ss-green:#2FB37A; --ss-red:#D9646A; --ss-amber:#D9A441;
+          --ss-bg:#070C0C; --ss-topbar:rgba(11,23,23,0.9);
+        }
+        .ss-theme.light {
+          --ss-panel:#FFFFFF; --ss-panel2:#F2EFE8; --ss-gold-lite:#8A6D22;
+          --ss-ivory:#14201F; --ss-dim:#61706E; --ss-line:rgba(7,12,12,0.10);
+          --ss-bg:#ECE8E0; --ss-topbar:rgba(255,255,255,0.9);
+        }
+      `}</style>
       <AuthForm
         admin
         title="Admin sign in"

@@ -77,8 +77,17 @@ render from built-in demo data and the admin shows an "offline" badge.
 
 See `docs/` for the API reference, database notes, and a short user guide.
 
+## Responsive & theming
+
+- **Mobile-ready:** both the storefront and admin adapt to phones and tablets —
+  the storefront nav collapses to a menu, grids reflow to 1–2 columns, and the
+  admin sidebar becomes a slide-over drawer on small screens.
+- **Light & dark mode:** dark is the default; tap the sun/moon icon (storefront
+  nav, or admin topbar) to switch. The choice is remembered across visits. All
+  theme colors live in one `.ss-theme` / `.ss-theme.light` block at the top of
+  each page component, so the palette is easy to fine-tune.
+
 ## Tech
 
 React 18 · Vite · React Router · Tailwind · lucide-react · recharts ·
 Flask · SQLAlchemy · Flask-JWT-Extended · SQLite (Postgres-ready).
-# style-statements

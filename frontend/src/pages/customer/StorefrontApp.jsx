@@ -2,33 +2,37 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProducts } from "../../hooks/useProducts";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import AuthForm from "../../components/auth/AuthForm";
 import {
   ShoppingBag, Heart, Search, Menu, X, Plus, Minus, Star,
   Instagram, Phone, MessageCircle, ChevronRight, MapPin, Mail,
   ArrowRight, Sparkles, Truck, ShieldCheck, Check, Home as HomeIcon,
-  User as UserIcon, LogOut, Package,
+  User as UserIcon, LogOut, Package, Sun, Moon,
 } from "lucide-react";
 
 /* ---------- Brand tokens (pulled from the Style Statements Instagram) ---------- */
+/* ---------- Brand tokens → CSS variables (themeable; see the <style> block) ---------- */
 const C = {
-  teal: "#0A4548",
-  tealDeep: "#062B2D",
-  tealBright: "#0E5F63",
-  cyan: "#25C2C7",
-  gold: "#C9A24B",
-  goldLite: "#E6CD8C",
-  ink: "#070C0C",
-  ivory: "#F6F3EC",
-  dim: "#B9C2C1",
+  teal: "var(--ss-teal)",
+  tealDeep: "var(--ss-teal-deep)",
+  tealBright: "var(--ss-teal-bright)",
+  cyan: "var(--ss-cyan)",
+  gold: "var(--ss-gold)",
+  goldLite: "var(--ss-gold-lite)",
+  ink: "var(--ss-ink)",      // always-dark (e.g. text on gold buttons)
+  ivory: "var(--ss-ivory)",  // primary foreground (flips in light mode)
+  dim: "var(--ss-dim)",
+  bg: "var(--ss-bg)",        // page background (flips in light mode)
+  shade: "var(--ss-shade)",  // photo overlay tint
 };
 
-/* Recreates the teal satin sheen from the brand's posts without image assets */
+/* Recreates the teal satin sheen; the highlight/shadow stops flip with the theme */
 const satin = (a = 135, deep = false) => ({
   backgroundColor: deep ? C.tealDeep : C.teal,
   backgroundImage: `
-    radial-gradient(120% 90% at 22% 18%, rgba(37,194,199,0.28), rgba(37,194,199,0) 46%),
-    radial-gradient(120% 120% at 82% 88%, rgba(6,43,45,0.85), rgba(6,43,45,0) 55%),
+    radial-gradient(120% 90% at 22% 18%, var(--ss-satin-hi), transparent 46%),
+    radial-gradient(120% 120% at 82% 88%, var(--ss-satin-lo), transparent 55%),
     linear-gradient(${a}deg, ${C.tealBright} 0%, ${C.teal} 38%, ${C.tealDeep} 100%)`,
 });
 
@@ -87,7 +91,7 @@ function ProductVisual({ name, sub, tall, img }) {
         <img src={img} alt={name} loading="lazy" onError={() => setBroken(true)}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       )}
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(6,43,45,0.55) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(180deg, transparent 55%, var(--ss-shade) 100%)" }} />
       {!showPhoto && (
         <div style={{ textAlign: "center", zIndex: 1, padding: 20 }}>
           <div style={{ ...script, color: C.goldLite, fontSize: 13, letterSpacing: 3, textTransform: "uppercase" }}>{sub}</div>
@@ -103,6 +107,7 @@ export default function StyleStatements() {
   // Live catalog from the backend; SEED_PRODUCTS renders if the API is offline.
   const { products: PRODUCTS, online } = useProducts(SEED_PRODUCTS);
   const { user, login, register, logout } = useAuth();
+  const { isLight, toggle } = useTheme();
   const navigate = useNavigate();
   const [view, setView] = useState("home");
   const [active, setActive] = useState(null);
@@ -203,7 +208,7 @@ export default function StyleStatements() {
     <>
       {/* Hero */}
       <div style={{ ...satin(140), minHeight: 620, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(180deg, rgba(7,12,12,0.35), rgba(6,43,45,0.6))" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(180deg, var(--ss-shade), var(--ss-shade))" }} />
         <Frame pad={40} len={80} w={2} color="rgba(246,243,236,0.6)" style={{ position: "relative", zIndex: 1, padding: "70px 60px", textAlign: "center" }}>
           <div className="ss-rise">
             <Eyebrow light>Fashion Accessories · Nairobi</Eyebrow>
@@ -239,7 +244,7 @@ export default function StyleStatements() {
           {Object.keys(CATS).map((cat) => (
             <div key={cat} className="ss-cat" onClick={() => { setFilter(cat); go("shop"); }} style={{ cursor: "pointer" }}>
               <Frame pad={16} len={34} style={{ ...satin(120), height: 300, borderRadius: 4, overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
-                <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(6,43,45,0.75) 100%)" }} />
+                <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(180deg, transparent 40%, var(--ss-shade) 100%)" }} />
                 <div style={{ position: "relative", padding: 26 }}>
                   <h3 style={{ ...serif, color: C.ivory, fontSize: 26 }}>{cat}</h3>
                   <span style={{ ...sans, fontSize: 12, letterSpacing: 1, color: C.goldLite, display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6 }}>Shop now <ArrowRight size={14} /></span>
@@ -510,9 +515,23 @@ export default function StyleStatements() {
   const nav = [["Home", "home"], ["Shop", "shop"], ["About", "about"], ["Contact", "contact"]];
 
   return (
-    <div style={{ background: C.ink, minHeight: "100vh", ...sans, overflowX: "hidden" }}>
+    <div className={`ss-theme ${isLight ? "light" : ""}`} style={{ background: C.bg, minHeight: "100vh", ...sans, overflowX: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600&display=swap');
+        .ss-theme {
+          --ss-teal:#0A4548; --ss-teal-deep:#062B2D; --ss-teal-bright:#0E5F63;
+          --ss-cyan:#25C2C7; --ss-gold:#C9A24B; --ss-gold-lite:#E6CD8C;
+          --ss-ink:#070C0C; --ss-ivory:#F6F3EC; --ss-dim:#B9C2C1;
+          --ss-bg:#070C0C; --ss-nav:rgba(7,12,12,0.85); --ss-shade:rgba(6,43,45,0.55);
+          --ss-satin-hi:rgba(37,194,199,0.28); --ss-satin-lo:rgba(6,43,45,0.85);
+        }
+        .ss-theme.light {
+          /* satin becomes a pale teal shimmer; text flips dark; page goes light */
+          --ss-teal:#BEDCDA; --ss-teal-deep:#A6CECB; --ss-teal-bright:#D9ECEA;
+          --ss-gold-lite:#8A6D22; --ss-ivory:#122120; --ss-dim:#556663;
+          --ss-bg:#F4F0E8; --ss-nav:rgba(244,240,232,0.9); --ss-shade:rgba(255,255,255,0.35);
+          --ss-satin-hi:rgba(255,255,255,0.5); --ss-satin-lo:rgba(150,190,188,0.45);
+        }
         * { box-sizing: border-box; }
         .ss-card .ss-add:hover, .ss-gold:hover { filter: brightness(1.06); }
         .ss-ghost:hover { border-color: rgba(246,243,236,0.7); }
@@ -543,7 +562,7 @@ export default function StyleStatements() {
       `}</style>
 
       {/* NAV */}
-      <header style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(7,12,12,0.85)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(201,162,75,0.18)` }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 40, background: "var(--ss-nav)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(201,162,75,0.18)` }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <button onClick={() => go("home")} style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
             <div style={{ ...serif, color: C.ivory, fontSize: 20, letterSpacing: 4, lineHeight: 1 }}>STYLE</div>
@@ -558,6 +577,7 @@ export default function StyleStatements() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <button onClick={() => go("shop")} aria-label="Search" style={ic}><Search size={19} color={C.ivory} /></button>
+            <button onClick={toggle} aria-label="Toggle light or dark mode" style={ic}>{isLight ? <Moon size={18} color={C.ivory} /> : <Sun size={18} color={C.ivory} />}</button>
             <button onClick={() => go("shop")} aria-label="Wishlist" style={{ ...ic, position: "relative" }}>
               <Heart size={19} color={C.ivory} />
               {wish.length > 0 && <Badge n={wish.length} />}
