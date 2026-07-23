@@ -1,4 +1,5 @@
 """Seed the database with the Style Statements catalog on first run."""
+import os
 from app.config.database import db
 from app.models.user import User
 from app.models.category import Category
@@ -59,10 +60,16 @@ def seed_if_empty():
     if User.query.first():
         return  # already initialised
 
-    # ---- default admin only (your login; not fake data) ----
-    admin = User(full_name="Shine", email="owner@stylestatements.co.ke",
-                 phone="0704358866", role="super_admin")
-    admin.set_password("changeme123")
+    # ---- default super admin only (your login; not fake data) ----
+    # No personal name by default — it's the store owner account, not a person.
+    # Set ADMIN_NAME / ADMIN_EMAIL / ADMIN_PASSWORD in .env to customise.
+    admin = User(
+        full_name=os.getenv("ADMIN_NAME", ""),
+        email=os.getenv("ADMIN_EMAIL", "owner@stylestatements.co.ke"),
+        phone=os.getenv("ADMIN_PHONE", "0704358866"),
+        role="super_admin",
+    )
+    admin.set_password(os.getenv("ADMIN_PASSWORD", "changeme123"))
     db.session.add(admin)
 
     # ---- category structure (the store taxonomy; needed by the Add Product form) ----

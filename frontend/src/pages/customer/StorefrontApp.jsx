@@ -108,6 +108,8 @@ export default function StyleStatements() {
   const { products: PRODUCTS, online } = useProducts(SEED_PRODUCTS);
   const { user, login, register, logout } = useAuth();
   const { isLight, toggle } = useTheme();
+  // Accounts may have no personal name (e.g. the owner account) — fall back gracefully.
+  const firstName = (user && user.full_name && user.full_name.trim().split(" ")[0]) || "there";
   const navigate = useNavigate();
   const [view, setView] = useState("home");
   const [active, setActive] = useState(null);
@@ -296,19 +298,6 @@ export default function StyleStatements() {
           ))}
         </div>
       </Section>
-
-      {/* Newsletter */}
-      <div style={{ ...satin(150, true) }}>
-        <Section style={{ padding: "60px 24px", textAlign: "center" }}>
-          <Eyebrow light>Join the list</Eyebrow>
-          <h2 style={{ ...serif, color: C.ivory, fontSize: 30, margin: "14px 0 8px" }}>First access to every drop</h2>
-          <p style={{ ...sans, color: C.dim, marginBottom: 22 }}>Early access, private sales, and styling notes.</p>
-          <div style={{ display: "flex", gap: 10, maxWidth: 460, margin: "0 auto", flexWrap: "wrap", justifyContent: "center" }}>
-            <input placeholder="Your email address" style={{ ...sans, flex: 1, minWidth: 220, background: "rgba(7,12,12,0.4)", border: `1px solid rgba(246,243,236,0.25)`, color: C.ivory, padding: "13px 16px", borderRadius: 2, outline: "none" }} />
-            <GoldBtn onClick={() => {}}>Subscribe</GoldBtn>
-          </div>
-        </Section>
-      </div>
     </>
   );
 
@@ -488,7 +477,7 @@ export default function StyleStatements() {
       ) : (
         <>
           <Eyebrow>My account</Eyebrow>
-          <h1 style={{ ...serif, color: C.ivory, fontSize: 32, margin: "10px 0 6px" }}>Hello, {user.full_name.split(" ")[0]}</h1>
+          <h1 style={{ ...serif, color: C.ivory, fontSize: 32, margin: "10px 0 6px" }}>Hello, {firstName}</h1>
           <p style={{ ...sans, color: C.dim, fontSize: 14, marginBottom: 26 }}>{user.email}</p>
           <div style={{ display: "grid", gap: 12 }}>
             {isAdmin && (
@@ -588,7 +577,7 @@ export default function StyleStatements() {
             </button>
             <button onClick={() => go("account")} aria-label="Account" style={{ ...ic, display: "inline-flex", alignItems: "center", gap: 6 }}>
               <UserIcon size={19} color={view === "account" ? C.gold : C.ivory} />
-              {user && <span style={{ ...sans, color: view === "account" ? C.gold : C.ivory, fontSize: 12.5, fontWeight: 600 }}>{user.full_name.split(" ")[0]}</span>}
+              {user && <span style={{ ...sans, color: view === "account" ? C.gold : C.ivory, fontSize: 12.5, fontWeight: 600 }}>{firstName}</span>}
             </button>
             <button className="ss-burger" onClick={() => setMenuOpen((m) => !m)} aria-label="Menu" style={{ ...ic, display: "none" }}>{menuOpen ? <X size={20} color={C.ivory} /> : <Menu size={20} color={C.ivory} />}</button>
           </div>

@@ -10,10 +10,6 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-change-me")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=7)
 
-    # Invite code required to self-register an admin/staff account.
-    # Change this in .env; if blank, admin signup is disabled entirely.
-    ADMIN_SIGNUP_CODE = os.getenv("ADMIN_SIGNUP_CODE", "SS-ADMIN-SETUP")
-
     # Load the sample Style Statements catalog on first run? Off = empty store.
     SEED_SAMPLE_DATA = os.getenv("SEED_SAMPLE_DATA", "false").lower() == "true"
 

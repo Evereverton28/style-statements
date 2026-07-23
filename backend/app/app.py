@@ -24,9 +24,10 @@ def create_app():
     from app.routes.customer_routes import bp as customer_bp
     from app.routes.analytics_routes import bp as analytics_bp
     from app.routes.admin_routes import bp as admin_bp
+    from app.routes.user_routes import bp as team_bp
 
     for bp in (auth_bp, product_bp, category_bp, cart_bp, order_bp,
-               review_bp, customer_bp, analytics_bp, admin_bp):
+               review_bp, customer_bp, analytics_bp, admin_bp, team_bp):
         app.register_blueprint(bp)
 
     @app.get("/")

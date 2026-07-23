@@ -45,7 +45,8 @@ const KES = (n) => "KES " + Number(n).toLocaleString("en-KE");
 /* ---------- Role permissions ---------- */
 const ROLES = {
   "Super Admin": ["dashboard", "products", "orders", "customers", "marketing", "reviews", "analytics", "messages", "content", "users", "settings"],
-  Manager: ["dashboard", "products", "orders", "customers", "marketing", "reviews", "analytics", "messages", "content"],
+  // Managers get "users" so they can create/manage Staff (server limits them to Staff only).
+  Manager: ["dashboard", "products", "orders", "customers", "marketing", "reviews", "analytics", "messages", "content", "users"],
   Staff: ["dashboard", "products", "orders", "reviews", "messages"],
 };
 
@@ -78,7 +79,6 @@ const PIE = [C.gold, C.cyan, C.tealBright, C.goldLite];
 
 /* =================================================================== */
 export default function Admin() {
-  const [role, setRole] = useState("Super Admin");
   const [section, setSection] = useState("dashboard");
   const [sidebar, setSidebar] = useState(() => (typeof window !== "undefined" ? window.innerWidth > 900 : true));
   const [products, setProducts] = useState(seedProducts);
@@ -93,9 +93,40 @@ export default function Admin() {
   // ---- live backend integration ----
   const seededUser = authService.currentUser();
   const [authed, setAuthed] = useState(!!seededUser && seededUser.role !== "customer");
+  const [me, setMe] = useState(seededUser);
+  // Accounts may have no personal name (e.g. the owner account) — fall back to the role.
+  const ROLE_TITLE = { super_admin: "Super Admin", manager: "Manager", staff: "Staff" };
+  // Role comes from the signed-in account only — there is no switching.
+  const role = (me && ROLE_TITLE[me.role]) || "Staff";
+  const displayName = (me && me.full_name && me.full_name.trim()) || role;
   const [summary, setSummary] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [apiOnline, setApiOnline] = useState(false);
+  const [team, setTeam] = useState([]);
+  const [canCreate, setCanCreate] = useState([]);   // roles this account may create (from server)
+  const [teamModal, setTeamModal] = useState(null);
+  const [teamErr, setTeamErr] = useState("");
+
+  const loadTeam = () =>
+    api.get("/api/admin/users", true)
+      .then((d) => { setTeam(d.users || []); setCanCreate(d.can_create || []); })
+      .catch(() => { setTeam([]); setCanCreate([]); });
+
+  const createTeamMember = (data) => {
+    setTeamErr("");
+    api.post("/api/admin/users", data, true)
+      .then(() => { setTeamModal(null); loadTeam(); })
+      .catch((e) => setTeamErr(e.message));
+  };
+  const toggleTeamActive = (u) => {
+    setTeam((t) => t.map((x) => (x.id === u.id ? { ...x, is_active: !x.is_active } : x)));
+    api.patch(`/api/admin/users/${u.id}/status`, { is_active: !u.is_active }, true)
+      .catch(() => loadTeam());
+  };
+  const deleteTeamMember = (id) => {
+    setTeam((t) => t.filter((x) => x.id !== id));
+    api.del(`/api/admin/users/${id}`, true).catch(() => loadTeam());
+  };
 
   useEffect(() => {
     if (!authed) return;
@@ -115,6 +146,7 @@ export default function Admin() {
       })));
     }).catch(() => {});
     orderService.analyticsSummary().then((s) => { if (alive) setSummary(s); }).catch(() => {});
+    loadTeam();
     return () => { alive = false; };
   }, [authed]);
 
@@ -132,10 +164,22 @@ export default function Admin() {
   const Btn = ({ children, onClick, ghost }) => (
     <button onClick={onClick} style={{ ...sans, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 12.5, fontWeight: 600, letterSpacing: .5, padding: "9px 15px", borderRadius: 6, border: ghost ? `1px solid ${C.line}` : "none", background: ghost ? "transparent" : `linear-gradient(135deg, ${C.goldLite}, ${C.gold})`, color: ghost ? C.ivory : C.ink }}>{children}</button>
   );
+  // Tint helper — colours are CSS variables now, so concatenating hex alpha
+  // (e.g. `var(--x)22`) is invalid. color-mix keeps the tint working.
+  const tint = (c, pct) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
   const Pill = ({ status }) => {
-    const map = { Active: C.green, Approved: C.green, Delivered: C.green, Pending: C.amber, Processing: C.cyan, "Ready for Delivery": C.gold, Scheduled: C.cyan, Cancelled: C.red, Rejected: C.red, Low: C.red };
+    const map = { Active: C.green, Approved: C.green, Delivered: C.green, Pending: C.amber, Processing: C.cyan, "Ready for Delivery": C.gold, Scheduled: C.cyan, Cancelled: C.red, Rejected: C.red, Low: C.red, Inactive: C.red };
     const c = map[status] || C.dim;
-    return <span style={{ ...sans, fontSize: 11, fontWeight: 600, color: c, background: c + "22", border: `1px solid ${c}44`, padding: "3px 10px", borderRadius: 999 }}>{status}</span>;
+    return <span style={{ ...sans, fontSize: 11, fontWeight: 600, color: c, background: tint(c, 14), border: `1px solid ${tint(c, 28)}`, padding: "3px 10px", borderRadius: 999 }}>{status}</span>;
+  };
+
+  // Shows the actual role name (not a status word).
+  const RolePill = ({ role }) => {
+    const map = { super_admin: C.gold, manager: C.cyan, staff: C.dim };
+    const label = { super_admin: "Super Admin", manager: "Manager", staff: "Staff" }[role] || role;
+    const c = map[role] || C.dim;
+    return <span style={{ ...sans, fontSize: 11, fontWeight: 600, color: c, background: tint(c, 14), border: `1px solid ${tint(c, 28)}`, padding: "3px 10px", borderRadius: 999 }}>{label}</span>;
   };
 
   /* ---------- KPI card ---------- */
@@ -344,14 +388,14 @@ export default function Admin() {
             <tr key={c.email}>
               <Td><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={c.name} />{c.name}</div></Td>
               <Td><span style={{ color: C.dim }}>{c.email}</span></Td><Td>{c.orders}</Td><Td>{KES(c.spent)}</Td>
-              <Td><Pill status={c.tier === "VIP" ? "Active" : c.tier === "New" ? "Processing" : "Scheduled"} /></Td>
+              <Td><span style={{ ...sans, fontSize: 11, fontWeight: 600, color: c.tier === "VIP" ? C.gold : c.tier === "New" ? C.cyan : C.green, background: tint(c.tier === "VIP" ? C.gold : c.tier === "New" ? C.cyan : C.green, 14), border: `1px solid ${tint(c.tier === "VIP" ? C.gold : c.tier === "New" ? C.cyan : C.green, 28)}`, padding: "3px 10px", borderRadius: 999 }}>{c.tier}</span></Td>
             </tr>
           ))}
         </Table>
       </Panel>
     </>
   );
-  const Avatar = ({ name }) => <div style={{ width: 32, height: 32, borderRadius: 999, background: `linear-gradient(135deg, ${C.gold}, ${C.tealBright})`, display: "grid", placeItems: "center", ...sans, color: C.ink, fontSize: 12, fontWeight: 700 }}>{name[0]}</div>;
+  const Avatar = ({ name }) => <div style={{ width: 32, height: 32, borderRadius: 999, background: `linear-gradient(135deg, ${C.gold}, ${C.tealBright})`, display: "grid", placeItems: "center", ...sans, color: C.ink, fontSize: 12, fontWeight: 700 }}>{((name || "").trim()[0] || "•").toUpperCase()}</div>;
 
   /* ---------- Reviews ---------- */
   const setReview = (id, status) => {
@@ -513,23 +557,75 @@ export default function Admin() {
     </>
   );
 
-  const UsersRoles = () => (
-    <>
-      <H>Users & Roles</H><Sub>Team access with role-based permissions.</Sub>
-      <Panel pad={16}>
-        <Table cols={["Member", "Email", "Role", "Access"]}>
-          {[["Shine", "owner@stylestatements.co.ke", "Super Admin"], ["Store Manager", "manager@stylestatements.co.ke", "Manager"], ["Sales Staff", "staff@stylestatements.co.ke", "Staff"]].map(([n, e, r]) => (
-            <tr key={e}>
-              <Td><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={n} />{n}</div></Td>
-              <Td><span style={{ color: C.dim }}>{e}</span></Td>
-              <Td><Pill status={r === "Super Admin" ? "Active" : r === "Manager" ? "Scheduled" : "Processing"} /></Td>
-              <Td><span style={{ ...sans, color: C.dim, fontSize: 12 }}>{ROLES[r].length} sections</span></Td>
-            </tr>
-          ))}
-        </Table>
-      </Panel>
-    </>
-  );
+  const ROLE_LABEL = { super_admin: "Super Admin", manager: "Manager", staff: "Staff" };
+
+  const UsersRoles = () => {
+    // canCreate comes from the server — it is the authority on what this
+    // account may do. The UI only mirrors it; the API re-checks every request.
+    const canCreateAny = canCreate.length > 0;
+
+    return (
+      <>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <H>Users & Roles</H>
+            <Sub>
+              {canCreateAny
+                ? `You can create and manage: ${canCreate.map((r) => ROLE_LABEL[r]).join(" and ")} accounts.`
+                : "You don't have permission to manage team accounts."}
+            </Sub>
+          </div>
+          {canCreateAny && (
+            <Btn onClick={() => setTeamModal({ full_name: "", email: "", password: "", phone: "", role: canCreate[0] })}>
+              <Plus size={15} /> Add Team Member
+            </Btn>
+          )}
+        </div>
+
+        <Panel pad={16}>
+          {team.length === 0 ? (
+            <div style={{ ...sans, color: C.dim, fontSize: 13, textAlign: "center", padding: "28px 0" }}>
+              {canCreateAny ? "No team members yet. Add your first one above." : "No team accounts visible to your role."}
+            </div>
+          ) : (
+            <Table cols={["Member", "Email", "Role", "Status", canCreateAny ? "Actions" : ""]}>
+              {team.map((u) => {
+                const manageable = canCreate.includes(u.role);
+                return (
+                  <tr key={u.id}>
+                    <Td><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={u.full_name} />{(u.full_name && u.full_name.trim()) || <span style={{ color: C.dim, fontStyle: "italic" }}>{ROLE_LABEL[u.role]}</span>}</div></Td>
+                    <Td><span style={{ color: C.dim }}>{u.email}</span></Td>
+                    <Td><RolePill role={u.role} /></Td>
+                    <Td><Pill status={u.is_active ? "Active" : "Inactive"} /></Td>
+                    <Td>
+                      {manageable && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <IconBtn onClick={() => toggleTeamActive(u)}>
+                            {u.is_active ? <X size={14} color={C.amber} /> : <Check size={14} color={C.green} />}
+                          </IconBtn>
+                          <IconBtn onClick={() => deleteTeamMember(u.id)}><Trash2 size={14} color={C.red} /></IconBtn>
+                        </div>
+                      )}
+                    </Td>
+                  </tr>
+                );
+              })}
+            </Table>
+          )}
+        </Panel>
+
+        <Panel style={{ marginTop: 16 }}>
+          <PanelHead title="How accounts are created" note="Role hierarchy" />
+          <div style={{ ...sans, color: C.dim, fontSize: 13, lineHeight: 1.9 }}>
+            <div><strong style={{ color: C.ivory }}>Super Admin</strong> — creates & manages Managers and Staff</div>
+            <div><strong style={{ color: C.ivory }}>Manager</strong> — creates & manages Staff only</div>
+            <div><strong style={{ color: C.ivory }}>Staff</strong> — no account management</div>
+            <div><strong style={{ color: C.ivory }}>Customers</strong> — register themselves on the public Sign Up page</div>
+          </div>
+        </Panel>
+      </>
+    );
+  };
 
   const SettingsView = () => (
     <>
@@ -553,7 +649,7 @@ export default function Admin() {
   const views = { dashboard: Dashboard, products: Products, orders: Orders, customers: Customers, marketing: Marketing, reviews: Reviews, analytics: Analytics, messages: Messages, content: Content, users: UsersRoles, settings: SettingsView };
   const Active = views[view];
 
-  if (!authed) return <LoginGate onAuthed={(u) => { setRole(u.role === "super_admin" ? "Super Admin" : u.role === "manager" ? "Manager" : "Staff"); setAuthed(true); }} />;
+  if (!authed) return <LoginGate onAuthed={(u) => { setMe(u); setAuthed(true); }} />;
 
   return (
     <div className={`ss-theme ${isLight ? "light" : ""}`} style={{ display: "flex", minHeight: "100vh", background: C.bg, ...sans }}>
@@ -606,7 +702,7 @@ export default function Admin() {
             ))}
           </nav>
           <div style={{ padding: 12, borderTop: `1px solid ${C.line}` }}>
-            <button onClick={() => {}} style={{ ...sans, width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 7, border: `1px solid ${C.line}`, background: "transparent", color: C.dim, cursor: "pointer", fontSize: 13 }}><LogOut size={16} /> Sign out</button>
+            <button onClick={() => { authService.logout(); setMe(null); setAuthed(false); }} style={{ ...sans, width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 7, border: `1px solid ${C.line}`, background: "transparent", color: C.dim, cursor: "pointer", fontSize: 13 }}><LogOut size={16} /> Sign out</button>
           </div>
         </div>
       </aside>
@@ -620,13 +716,10 @@ export default function Admin() {
             <Search size={15} color={C.dim} /><input placeholder="Search orders, products, customers…" style={{ ...sans, background: "none", border: "none", color: C.ivory, outline: "none", width: "100%", fontSize: 13 }} />
           </div>
           <div style={{ flex: 1 }} />
-          {/* Role switcher — demonstrates permission gating */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ ...sans, color: C.dim, fontSize: 11, letterSpacing: .5 }}>VIEW AS</span>
-            <select value={role} onChange={(e) => setRole(e.target.value)} style={{ ...sans, background: C.panel2, color: C.gold, border: `1px solid ${C.line}`, borderRadius: 7, padding: "8px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
-              {Object.keys(ROLES).map((r) => <option key={r}>{r}</option>)}
-            </select>
-          </div>
+          {/* Signed-in role — read-only, comes from the account */}
+          <span style={{ ...sans, color: C.gold, fontSize: 11.5, fontWeight: 600, letterSpacing: .5, background: "rgba(201,162,75,0.12)", border: `1px solid rgba(201,162,75,0.35)`, padding: "6px 12px", borderRadius: 999 }}>
+            {role}
+          </span>
           <button onClick={toggle} aria-label="Toggle light or dark mode" style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: 9, cursor: "pointer", display: "grid", placeItems: "center" }}>
             {isLight ? <Moon size={17} color={C.ivory} /> : <Sun size={17} color={C.ivory} />}
           </button>
@@ -634,13 +727,35 @@ export default function Admin() {
             <Bell size={17} color={C.ivory} />
             <span style={{ position: "absolute", top: 5, right: 6, width: 7, height: 7, borderRadius: 999, background: C.red }} />
           </button>
-          <Avatar name="Shine" />
+          <Avatar name={displayName} />
         </header>
 
         <main style={{ padding: 24, maxWidth: 1240 }}>
           <Active />
         </main>
       </div>
+
+      {/* TEAM MEMBER MODAL */}
+      {teamModal && (
+        <div onClick={() => { setTeamModal(null); setTeamErr(""); }} style={{ position: "fixed", inset: 0, background: "rgba(7,12,12,0.7)", zIndex: 80, display: "grid", placeItems: "center", padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 420, maxWidth: "100%", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ ...serif, color: C.ivory, fontSize: 20 }}>Add team member</span>
+              <button onClick={() => { setTeamModal(null); setTeamErr(""); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.dim} /></button>
+            </div>
+            <p style={{ ...sans, color: C.dim, fontSize: 12, margin: "0 0 18px" }}>
+              Customers can't be created here — they sign up themselves.
+            </p>
+            <TeamForm
+              initial={teamModal}
+              roles={canCreate}
+              error={teamErr}
+              onSave={createTeamMember}
+              inp={inp}
+            />
+          </div>
+        </div>
+      )}
 
       {/* PRODUCT MODAL */}
       {modal && (
@@ -700,15 +815,48 @@ function LoginGate({ onAuthed }) {
       `}</style>
       <AuthForm
         admin
+        allowSignup={false}
         title="Admin sign in"
-        subtitle="Manage your store"
+        subtitle="Managers and staff sign in with the account created for them"
         onLogin={(email, password) => authService.login(email, password)}
-        onRegister={(payload) => authService.adminRegister(payload)}
         onSuccess={(user) => {
           if (user.role === "customer") throw new Error("This account is not an admin.");
           onAuthed(user);
         }}
       />
+    </div>
+  );
+}
+
+/* ---------- Team member creation form ---------- */
+function TeamForm({ initial, roles, error, onSave, inp }) {
+  const [f, setF] = useState(initial);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const ROLE_LABEL = { super_admin: "Super Admin", manager: "Manager", staff: "Staff" };
+  const L = ({ label, children }) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ ...sans, color: C.dim, fontSize: 12, display: "block", marginBottom: 6 }}>{label}</label>
+      {children}
+    </div>
+  );
+  const valid = f.full_name && f.email && f.password && f.password.length >= 6;
+
+  return (
+    <div>
+      <L label="Full name"><input value={f.full_name} onChange={set("full_name")} style={inp} placeholder="e.g. Mary Wanjiku" /></L>
+      <L label="Email"><input value={f.email} onChange={set("email")} type="email" style={inp} placeholder="name@stylestatements.co.ke" /></L>
+      <L label="Temporary password"><input value={f.password} onChange={set("password")} type="password" style={inp} placeholder="At least 6 characters" /></L>
+      <L label="Phone (optional)"><input value={f.phone} onChange={set("phone")} style={inp} /></L>
+      <L label="Role">
+        <select value={f.role} onChange={set("role")} style={inp}>
+          {roles.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+        </select>
+      </L>
+      {error && <div style={{ ...sans, color: C.red, fontSize: 12.5, marginBottom: 12 }}>{error}</div>}
+      <button onClick={() => onSave(f)} disabled={!valid}
+        style={{ ...sans, width: "100%", marginTop: 4, cursor: valid ? "pointer" : "not-allowed", opacity: valid ? 1 : 0.5, background: `linear-gradient(135deg, ${C.goldLite}, ${C.gold})`, color: C.ink, border: "none", padding: "12px", borderRadius: 7, fontWeight: 600, fontSize: 13 }}>
+        Create account
+      </button>
     </div>
   );
 }

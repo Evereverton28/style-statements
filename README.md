@@ -35,11 +35,44 @@ Open **http://localhost:5173** for the storefront and **/admin** for the dashboa
 owner@stylestatements.co.ke  /  changeme123     ← change after first login
 ```
 
-**Accounts:** customers can sign up freely from the storefront (`/`, account icon).
-Admin/staff accounts require an **invite code** to sign up — set `ADMIN_SIGNUP_CODE`
-in `backend/.env` (default `SS-ADMIN-SETUP`). Enter it on the `/admin` signup form
-to create a Manager/Staff/Super Admin account. Leave the code blank to disable
-admin self-signup entirely.
+**Accounts:** customers sign themselves up from the storefront (`/`, account icon).
+**There is no admin signup** — Manager and Staff accounts are created *for* them by
+a Super Admin (or, for Staff, by a Manager) under **Users & Roles**. Team members
+then simply log in with the email and temporary password they were given.
+
+Each person sees only their own role's permissions; there is no role switching.
+
+### Account creation hierarchy
+
+| Role | Can create & manage | Where they sign in |
+|------|---------------------|--------------------|
+| **Super Admin** | Managers **and** Staff | storefront login → redirected to `/admin` |
+| **Manager** | Staff only | storefront login → redirected to `/admin` |
+| **Staff** | Nobody | storefront login → redirected to `/admin` |
+| **Customer** | — (self-registers) | storefront Sign Up / login → stays on shop |
+
+Everyone uses the **same login**; the account's role decides where they land and
+what they can do. Admins manage their team under **Users & Roles** in the
+dashboard, where "Add Team Member" only offers the roles that account is allowed
+to create. Customers can **never** be created from the admin panel — they must
+register themselves on the public Sign Up page.
+
+Deactivating an account immediately blocks that person from logging in.
+
+> Enforcement is server-side: every request re-checks the hierarchy, so a Manager
+> cannot create a Manager or Super Admin even by calling the API directly. The
+> hidden buttons in the UI are convenience, not the security boundary.
+> Rules live in `backend/app/utils/hierarchy.py`.
+
+> **Seeing an old name on the super admin?** The seeder only runs on a brand-new
+> database, so a database created by an earlier version can still hold outdated
+> details. Fix it in place without losing data:
+> ```bash
+> cd backend && source .venv/bin/activate
+> python fix_admin.py                  # clear the name
+> python fix_admin.py --show           # inspect the account
+> python fix_admin.py --password new1  # rotate the password
+> ```
 
 **The store starts empty** — 0 products, 0 orders, 0 customers, 0 reviews, and all
 dashboard metrics at zero. Only your admin login and the category structure
@@ -55,7 +88,7 @@ instead, set `SEED_SAMPLE_DATA=true` in `backend/.env` before first run (or dele
 |------|--------|
 | Storefront catalog (list, filter, sort, detail) | **Live** — fetched from `/api/products` |
 | Customer signup + login (storefront account) | **Live** — `/api/auth/register` + `/api/auth/login` |
-| Admin login + signup (invite-code gated) | **Live** — `/api/auth/login` + `/api/auth/admin-register` |
+| Admin login (Manager/Staff created by a superior) | **Live** — `/api/auth/login` + `/api/admin/users` |
 | Admin dashboard KPIs (revenue, orders, customers, AOV) | **Live** — `/api/analytics/summary` |
 | Admin products (list, add, edit, delete) | **Live** — `/api/products` CRUD |
 | Admin orders (list + status pipeline) | **Live** — `/api/admin/orders` |

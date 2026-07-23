@@ -13,13 +13,6 @@ export const authService = {
     localStorage.setItem("ss_user", JSON.stringify(data.user));
     return data.user;
   },
-  async adminRegister(payload) {
-    // payload: { full_name, email, password, phone?, role?, invite_code }
-    const data = await api.post("/api/auth/admin-register", payload);
-    localStorage.setItem("ss_token", data.token);
-    localStorage.setItem("ss_user", JSON.stringify(data.user));
-    return data.user;
-  },
   logout() {
     localStorage.removeItem("ss_token");
     localStorage.removeItem("ss_user");

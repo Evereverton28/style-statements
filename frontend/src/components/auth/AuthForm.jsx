@@ -2,7 +2,8 @@ import { useState } from "react";
 
 /* Reusable, brand-styled auth form (login + signup toggle).
    Parent supplies onLogin / onRegister handlers so the same UI works for
-   customers (via AuthContext) and admins (via authService with invite code). */
+   customers (signup + login) and admins (login only — admin accounts are
+   created for them by a Super Admin or Manager). */
 const C = {
   teal: "#0E5F63", tealDeep: "#062B2D", panel: "#0B1717", panel2: "#0F2122",
   gold: "#C9A24B", goldLite: "#E6CD8C", ink: "#070C0C",
@@ -17,7 +18,7 @@ export default function AuthForm({
   title = "Welcome back", subtitle = "Sign in to your account",
 }) {
   const [mode, setMode] = useState("login");
-  const [f, setF] = useState({ full_name: "", email: "", password: "", phone: "", role: "manager", invite_code: "" });
+  const [f, setF] = useState({ full_name: "", email: "", password: "", phone: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -30,9 +31,7 @@ export default function AuthForm({
       if (mode === "login") {
         user = await onLogin(f.email, f.password);
       } else {
-        const payload = { full_name: f.full_name, email: f.email, password: f.password, phone: f.phone };
-        if (admin) { payload.role = f.role; payload.invite_code = f.invite_code; }
-        user = await onRegister(payload);
+        user = await onRegister({ full_name: f.full_name, email: f.email, password: f.password, phone: f.phone });
       }
       onSuccess && onSuccess(user);
     } catch (e) {
@@ -66,18 +65,8 @@ export default function AuthForm({
       <input value={f.email} onChange={set("email")} placeholder="Email address" type="email" style={box} />
       <input value={f.password} onChange={set("password")} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="Password" type="password" style={box} />
 
-      {!isLogin && !admin && (
+      {!isLogin && (
         <input value={f.phone} onChange={set("phone")} placeholder="Phone (optional)" style={box} />
-      )}
-      {!isLogin && admin && (
-        <>
-          <select value={f.role} onChange={set("role")} style={box}>
-            <option value="manager">Manager</option>
-            <option value="staff">Staff</option>
-            <option value="super_admin">Super Admin</option>
-          </select>
-          <input value={f.invite_code} onChange={set("invite_code")} placeholder="Admin invite code" style={box} />
-        </>
       )}
 
       {err && <div style={{ ...sans, color: C.red, fontSize: 12.5, marginBottom: 12 }}>{err}</div>}
@@ -93,11 +82,6 @@ export default function AuthForm({
             style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontWeight: 600, ...sans, fontSize: 13 }}>
             {isLogin ? "Create an account" : "Sign in"}
           </button>
-        </div>
-      )}
-      {admin && (
-        <div style={{ ...sans, color: C.dim, fontSize: 11, textAlign: "center", marginTop: 14 }}>
-          Seeded admin: owner@stylestatements.co.ke / changeme123
         </div>
       )}
     </div>
